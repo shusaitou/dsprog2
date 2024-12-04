@@ -1,0 +1,11 @@
+# Pythonの仮想環境を除外
+.venv/
+venv/
+
+# pyenvのPythonバージョンファイルを除外（必要に応じて）
+.python-version
+
+# __pycache__ ディレクトリを除外
+__pycache__/
+
+# その他無視したいファイルやディレクトリがあればここに追加
