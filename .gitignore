@@ -9,3 +9,16 @@ venv/
 __pycache__/
 
 # その他無視したいファイルやディレクトリがあればここに追加
+# macOS
+.DS_Store
+
+# Python仮想環境
+.venv/
+venv/
+
+# Pythonキャッシュファイル
+__pycache__/
+*.py[cod]
+
+# その他
+.python-version
