@@ -1,6 +1,6 @@
 import flet as ft
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def main(page: ft.Page):
 
@@ -25,8 +25,8 @@ def main(page: ft.Page):
 
     # タイトルを追加（背景色を緑に設定）
     title_container = ft.Container(
-        content=ft.Text("天気予報アプリ", style=ft.TextThemeStyle.HEADLINE_MEDIUM),
-        bgcolor=ft.colors.LIGHT_GREEN_100,
+        content=ft.Text("天気予報アプリ", theme_style=ft.TextThemeStyle.HEADLINE_MEDIUM),
+        bgcolor=ft.Colors.LIGHT_GREEN_100,
         padding=ft.padding.all(10),
         alignment=ft.alignment.center,
     )
@@ -46,11 +46,12 @@ def main(page: ft.Page):
         width=300,
     )
 
-    # 日付選択用のデートピッカーを追加
-    date_picker = ft.DatePicker(
-        label="日付を選択してください（オプション）",
-        on_change=lambda e: on_date_selected(e),
+    # 日付選択用のドロップダウンを追加
+    date_dropdown = ft.Dropdown(
+        label="日付を選択してください",
+        options=[],
         width=300,
+        on_change=lambda e: on_date_selected(e),
     )
 
     # 天気予報表示用のコンテナ
@@ -68,7 +69,7 @@ def main(page: ft.Page):
     # ページに追加
     page.add(prefecture_dropdown)
     page.add(area_dropdown)
-    page.add(date_picker)
+    page.add(date_dropdown)  # 日付ドロップダウンを追加
     page.add(forecast_container)
 
     # 地域コードから地域情報へのマッピングを作成
@@ -96,13 +97,14 @@ def main(page: ft.Page):
         area_dropdown.value = None
         area_dropdown.update()
 
+        # 日付ドロップダウンをクリア
+        date_dropdown.options = []
+        date_dropdown.value = None
+        date_dropdown.update()
+
         # 天気予報をクリア
         forecast_container.controls.clear()
         forecast_container.update()
-
-        # デートピッカーの値をリセット
-        date_picker.value = None
-        date_picker.update()
 
     def on_area_change(area_code):
         nonlocal selected_area_code, forecast_data_by_date, selected_date
@@ -111,9 +113,14 @@ def main(page: ft.Page):
         selected_area_code = area_code
         selected_date = None  # 選択された日付をリセット
 
-        # デートピッカーの値をリセット
-        date_picker.value = None
-        date_picker.update()
+        # 日付ドロップダウンをクリア
+        date_dropdown.options = []
+        date_dropdown.value = None
+        date_dropdown.update()
+
+        # 天気予報をクリア
+        forecast_container.controls.clear()
+        forecast_container.update()
 
         # 選択された地域の情報を取得
         area_data_item = area_code_to_info.get(area_code)
@@ -177,29 +184,38 @@ def main(page: ft.Page):
             forecast_container.update()
             return
 
-        # 今日、明日、明後日の日付を取得
-        today = datetime.now().date()
-        dates_to_show = [ (today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(3) ]
+        # 入手したデータの日付一覧を取得
+        available_dates = sorted(forecast_data_by_date.keys())
 
-        # 天気予報を表示
-        display_forecast_for_dates(dates_to_show, area_name)
+        # 日付ドロップダウンを更新
+        date_dropdown.options = [
+            ft.dropdown.Option(date, date) for date in available_dates
+        ]
+        date_dropdown.value = None
+        date_dropdown.update()
+
+        # 最初の日付の予報を表示
+        if available_dates:
+            selected_date = available_dates[0]
+            display_forecast_for_dates([selected_date], area_name)
 
     def on_date_selected(e):
         nonlocal selected_date
         if not selected_area_code:
             return
-        selected_date = e.control.value
-        if selected_date:
-            selected_date_str = selected_date.strftime('%Y-%m-%d')
-            # 天気予報を表示
-            area_name = area_code_to_info[selected_area_code]['name']
-            display_forecast_for_dates([selected_date_str], area_name)
+        if e.control.value:
+            selected_date = e.control.value
+            if selected_date:
+                # 天気予報を表示
+                area_name = area_code_to_info[selected_area_code]['name']
+                display_forecast_for_dates([selected_date], area_name)
         else:
-            # 日付がクリアされた場合は今日、明日、明後日の予報を表示
-            today = datetime.now().date()
-            dates_to_show = [ (today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(3) ]
-            area_name = area_code_to_info[selected_area_code]['name']
-            display_forecast_for_dates(dates_to_show, area_name)
+            # 日付がクリアされた場合は最初の日付の予報を表示
+            available_dates = sorted(forecast_data_by_date.keys())
+            if available_dates:
+                selected_date = available_dates[0]
+                area_name = area_code_to_info[selected_area_code]['name']
+                display_forecast_for_dates([selected_date], area_name)
 
     def display_forecast_for_dates(dates_to_display, area_name=None):
         if not area_name:
@@ -207,7 +223,7 @@ def main(page: ft.Page):
 
         forecast_container.controls.clear()
         forecast_container.controls.append(
-            ft.Text(f"{area_name}の天気予報", style=ft.TextThemeStyle.TITLE_MEDIUM)
+            ft.Text(f"{area_name}の天気予報", theme_style=ft.TextThemeStyle.TITLE_MEDIUM)
         )
 
         for date in dates_to_display:
@@ -277,7 +293,7 @@ def main(page: ft.Page):
             padding=5,
             alignment=ft.alignment.center,
             width=150,
-            border=ft.border.all(0.5, ft.colors.GREY),
+            border=ft.border.all(0.5, ft.Colors.GREY),
             border_radius=10,
         )
 
