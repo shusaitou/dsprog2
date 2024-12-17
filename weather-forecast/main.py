@@ -1,6 +1,6 @@
 import flet as ft
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def main(page: ft.Page):
 
@@ -46,20 +46,8 @@ def main(page: ft.Page):
         width=300,
     )
 
-    # 日付選択用のデートピッカーを追加
-    date_picker = ft.DatePicker(
-        label="日付を選択してください（オプション）",
-        on_change=lambda e: on_date_selected(e),
-        width=300,
-    )
-
     # 天気予報表示用のコンテナ
     forecast_container = ft.Column(scroll="auto")  # スクロールを許可
-
-    # 変数を初期化
-    selected_area_code = None
-    forecast_data_by_date = {}
-    selected_date = None
 
     # イベントハンドラの設定はドロップダウン作成後に行う
     prefecture_dropdown.on_change = lambda e: on_prefecture_change(e.control.value)
@@ -68,7 +56,6 @@ def main(page: ft.Page):
     # ページに追加
     page.add(prefecture_dropdown)
     page.add(area_dropdown)
-    page.add(date_picker)
     page.add(forecast_container)
 
     # 地域コードから地域情報へのマッピングを作成
@@ -100,20 +87,9 @@ def main(page: ft.Page):
         forecast_container.controls.clear()
         forecast_container.update()
 
-        # デートピッカーの値をリセット
-        date_picker.value = None
-        date_picker.update()
-
     def on_area_change(area_code):
-        nonlocal selected_area_code, forecast_data_by_date, selected_date
         if not area_code:
             return
-        selected_area_code = area_code
-        selected_date = None  # 選択された日付をリセット
-
-        # デートピッカーの値をリセット
-        date_picker.value = None
-        date_picker.update()
 
         # 選択された地域の情報を取得
         area_data_item = area_code_to_info.get(area_code)
@@ -139,10 +115,18 @@ def main(page: ft.Page):
 
         forecast_data = forecast_response.json()
 
-        # 選択されたエリアの天気予報を抽出し、forecast_data_by_dateに格納
-        forecast_data_by_date = {}
+        # 選択されたエリアの天気予報を抽出
+        forecast_container.controls.clear()
+
+        # タイトルを追加
+        forecast_container.controls.append(
+            ft.Text(f"{area_name}の天気予報", style=ft.TextThemeStyle.TITLE_MEDIUM)
+        )
 
         found = False  # データが見つかったかのフラグ
+
+        # 日付ごとにデータをまとめるための辞書
+        forecast_by_date = {}
 
         # forecast_dataはリストになっている
         for series in forecast_data:
@@ -160,8 +144,8 @@ def main(page: ft.Page):
                             date_str = dt_time_define.strftime('%Y-%m-%d')
                             time_str = dt_time_define.strftime('%H:%M')
                             # 日付ごとにデータをまとめる
-                            if date_str not in forecast_data_by_date:
-                                forecast_data_by_date[date_str] = []
+                            if date_str not in forecast_by_date:
+                                forecast_by_date[date_str] = []
                             # 各データを取得
                             data = {}
                             for key in data_keys:
@@ -169,69 +153,28 @@ def main(page: ft.Page):
                                 value = values[i] if i < len(values) else None
                                 data[key] = value
                             # 時刻とデータを保存
-                            forecast_data_by_date[date_str].append({'time': time_str, 'data': data})
+                            forecast_by_date[date_str].append({'time': time_str, 'data': data})
 
         if not found:
-            forecast_container.controls.clear()
             forecast_container.controls.append(ft.Text("天気データが見つかりませんでした。", color="red"))
-            forecast_container.update()
-            return
-
-        # 今日、明日、明後日の日付を取得
-        today = datetime.now().date()
-        dates_to_show = [ (today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(3) ]
-
-        # 天気予報を表示
-        display_forecast_for_dates(dates_to_show, area_name)
-
-    def on_date_selected(e):
-        nonlocal selected_date
-        if not selected_area_code:
-            return
-        selected_date = e.control.value
-        if selected_date:
-            selected_date_str = selected_date.strftime('%Y-%m-%d')
-            # 天気予報を表示
-            area_name = area_code_to_info[selected_area_code]['name']
-            display_forecast_for_dates([selected_date_str], area_name)
         else:
-            # 日付がクリアされた場合は今日、明日、明後日の予報を表示
-            today = datetime.now().date()
-            dates_to_show = [ (today + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(3) ]
-            area_name = area_code_to_info[selected_area_code]['name']
-            display_forecast_for_dates(dates_to_show, area_name)
-
-    def display_forecast_for_dates(dates_to_display, area_name=None):
-        if not area_name:
-            area_name = area_code_to_info[selected_area_code]['name']
-
-        forecast_container.controls.clear()
-        forecast_container.controls.append(
-            ft.Text(f"{area_name}の天気予報", style=ft.TextThemeStyle.TITLE_MEDIUM)
-        )
-
-        for date in dates_to_display:
-            if date not in forecast_data_by_date:
-                continue
-            day_data = forecast_data_by_date[date]
-            # カードを作成
-            card = ft.Card(
-                content=ft.Container(
-                    content=ft.Column([
-                        ft.Text(f"{date}", weight=ft.FontWeight.BOLD, size=18),
-                        ft.Divider(),
-                        ft.Row([
-                            create_forecast_column(item['time'], item['data']) for item in day_data
-                        ], scroll="auto"),
-                    ]),
-                    padding=10,
+            # 日付順にソート
+            for date in sorted(forecast_by_date.keys()):
+                day_data = forecast_by_date[date]
+                # カードを作成
+                card = ft.Card(
+                    content=ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"{date}", weight=ft.FontWeight.BOLD, size=18),
+                            ft.Divider(),
+                            ft.Row([
+                                create_forecast_column(item['time'], item['data']) for item in day_data
+                            ], scroll="auto"),
+                        ]),
+                        padding=10,
+                    )
                 )
-            )
-            forecast_container.controls.append(card)
-
-        if len(forecast_container.controls) == 1:
-            # 予報がない場合
-            forecast_container.controls.append(ft.Text("指定された日の天気データが見つかりませんでした。", color="red"))
+                forecast_container.controls.append(card)
 
         forecast_container.update()
 
